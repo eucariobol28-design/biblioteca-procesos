@@ -73,6 +73,7 @@ def run_migrations(conn: Connection):
             genero_id INTEGER NOT NULL DEFAULT 1,
             cota_bibliografica TEXT,
             observaciones TEXT,
+            origen_id INTEGER NOT NULL DEFAULT 1,
             FOREIGN KEY (genero_id) REFERENCES generos(id) ON DELETE RESTRICT ON UPDATE CASCADE
         );
         """
@@ -100,11 +101,12 @@ def run_migrations(conn: Connection):
         );
         """
     )
-
     ensure_column("inventarios", "biblioteca_id", "INTEGER NOT NULL DEFAULT 1")
     ensure_column("inventarios", "sala_id", "INTEGER NOT NULL DEFAULT 1")
     ensure_column("inventarios", "cantidad_total", "INTEGER NOT NULL DEFAULT 0")
     ensure_column("inventarios", "cantidad_disponible", "INTEGER NOT NULL DEFAULT 0")
+    # legacy column used in older schemas
+    ensure_column("inventarios", "sede_id", "INTEGER NOT NULL DEFAULT 1")
 
     ensure_table(
         """
@@ -115,6 +117,12 @@ def run_migrations(conn: Connection):
             destino_biblioteca_id INTEGER NOT NULL,
             bultos INTEGER NOT NULL,
             responsable TEXT NOT NULL,
+            -- legacy compatibility columns
+            libro_id INTEGER DEFAULT 0,
+            sede_origen_id INTEGER DEFAULT 1,
+            sede_destino_id INTEGER DEFAULT 1,
+            cantidad INTEGER DEFAULT 0,
+            acta_numero TEXT DEFAULT '',
             FOREIGN KEY (destino_biblioteca_id) REFERENCES bibliotecas(id) ON DELETE RESTRICT ON UPDATE CASCADE
         );
         """
@@ -125,6 +133,12 @@ def run_migrations(conn: Connection):
     ensure_column("distribuciones", "destino_biblioteca_id", "INTEGER NOT NULL DEFAULT 1")
     ensure_column("distribuciones", "bultos", "INTEGER NOT NULL DEFAULT 0")
     ensure_column("distribuciones", "responsable", "TEXT NOT NULL DEFAULT ''")
+    # legacy columns
+    ensure_column("distribuciones", "libro_id", "INTEGER DEFAULT 0")
+    ensure_column("distribuciones", "sede_origen_id", "INTEGER DEFAULT 1")
+    ensure_column("distribuciones", "sede_destino_id", "INTEGER DEFAULT 1")
+    ensure_column("distribuciones", "cantidad", "INTEGER DEFAULT 0")
+    ensure_column("distribuciones", "acta_numero", "TEXT DEFAULT ''")
 
     ensure_table(
         """
