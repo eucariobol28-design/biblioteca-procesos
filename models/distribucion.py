@@ -33,11 +33,20 @@ class Distribucion:
     def registrar(self, destino_biblioteca_id: int, bultos: int, responsable: str):
         cursor = self.conn.cursor()
         num_acta = generar_acta_numero(self.contar_actas() + 1)
-        cursor.execute(
-            "INSERT INTO distribuciones (num_acta, destino_biblioteca_id, bultos, responsable) VALUES (?, ?, ?, ?);",
-            (num_acta, destino_biblioteca_id, bultos, responsable.strip()),
-        )
-        return cursor.lastrowid, num_acta
+        try:
+            cursor.execute(
+                "INSERT INTO distribuciones (num_acta, destino_biblioteca_id, bultos, responsable) VALUES (?, ?, ?, ?);",
+                (num_acta, destino_biblioteca_id, bultos, responsable.strip()),
+            )
+            return cursor.lastrowid, num_acta
+        except Exception:
+            # Tabla antigua con columnas legacy (ej. libro_id, sede_origen_id, sede_destino_id, cantidad)
+            # Intentar insertar proporcionando columnas legacy con valores por defecto seguros.
+            cursor.execute(
+                "INSERT INTO distribuciones (libro_id, sede_origen_id, sede_destino_id, cantidad, acta_numero, num_acta, destino_biblioteca_id, bultos, responsable) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                (0, 1, destino_biblioteca_id, bultos, num_acta, num_acta, destino_biblioteca_id, bultos, responsable.strip()),
+            )
+            return cursor.lastrowid, num_acta
 
     def registrar_detalle(
         self,

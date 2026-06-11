@@ -13,11 +13,14 @@ class Genero:
     def crear(self, nombre: str, metodo_wely_code: str) -> int:
         cursor = self.conn.cursor()
         cursor.execute(
-            "INSERT INTO generos (nombre, metodo_wely_code) VALUES (?, ?);",
+            "INSERT OR IGNORE INTO generos (nombre, metodo_wely_code) VALUES (?, ?);",
             (nombre.strip(), metodo_wely_code.strip()),
         )
         self.conn.commit()
-        return cursor.lastrowid
+        # obtener id (si se insertó o si ya existía)
+        cursor.execute("SELECT id FROM generos WHERE nombre = ?;", (nombre.strip(),))
+        row = cursor.fetchone()
+        return int(row[0]) if row else cursor.lastrowid
 
     def eliminar(self, genero_id: int) -> None:
         cursor = self.conn.cursor()
