@@ -1,0 +1,98 @@
+ANÁLISIS DE LA APLICACIÓN: Mejora de la Plataforma "Biblioteca - Procesos Técnicos"
+Proyecto: biblioteca-procesos
+Fecha: 2026-06-10
+Autor: Equipo / Generado por asistente
+
+1. Resumen funcional
+- Propósito: Aplicación de escritorio local (Tkinter + SQLite) para gestionar los procesos técnicos de una red de bibliotecas: recepción física de libros, catalogación (fichas y cotas), cola de impresión de cotas, distribución a sedes satélite, inventario por sala/biblioteca, gestión de usuarios y catálogos (salas, géneros, bibliotecas), y reportes mensuales.
+- Público objetivo: administradores y operadores de procesos técnicos de bibliotecas regionales.
+
+2. Arquitectura y tecnologías
+- Lenguaje: Python 3.x
+- UI: tkinter (tkinter.ttk)
+- BD: SQLite (archivo `biblioteca.db` local)
+- Estructura: modular MVC-like (carpetas `core`, `database`, `models`, `controllers`, `views`)
+- Componentes claves:
+  - `database/migrations.py`, `database/conexion.py` — inicialización y esquema
+  - `models/*` — acceso y lógica ligera por entidad (Libro, Inventario, Ficha, Distribucion, Genero, Sala, Biblioteca, Usuario)
+  - `controllers/*` — orquestación por caso de uso (BibliotecaController es controlador central)
+  - `views/*` — pantallas Tkinter por flujo
+  - `main.py` — arranque y ruteo entre vistas
+
+3. Flujo principal (resumen)
+- Login -> Panel principal -> Recepción (registrar libro y stock en Sede Central) -> Catalogación (calcular/aprobar cota, crear ficha) -> Cola de impresión (previsualizar/imprimir cotas) -> Distribución (generar actas, mover stock entre sedes/salas) -> Reportes mensuales.
+
+4. Observaciones sobre el estado actual (limitaciones / puntos detectados)
+- Esquema de BD: ha sido ampliado para soportar `genero_id`, inventario por `biblioteca_id` y `sala_id`, pero convive con columnas antiguas en `libros` (campos legacy), lo cual requiere limpieza o migraciones inteligentes.
+- Concurrency / transacciones: se usan transacciones manuales en algunos puntos; SQLite es local y no concurrente para múltiples procesos, por lo que hay riesgo si varios usuarios intentan acceder al mismo archivo simultáneamente (no provisto de servidor centralizado).
+- Validaciones en UI: entradas mínimas realizadas, pero faltan validaciones más estrictas (ISBN formato, longitud, duplicados más claros, manejo de campos vacíos, control de cargas masivas).
+- Manejo de errores: errores se muestran con messagebox, pero falta logging estructurado para depuración y trazabilidad (ficheros `logs/` y niveles).
+- Tests: no hay pruebas automatizadas (unitarias o de integración).
+- Seguridad: contraseñas se almacenan con SHA-256 (mejor que texto plano), pero no hay sal (salt) ni PBKDF2/Argon2 para proteger hashes. No hay gestión de sesiones o bloqueo de intentos.
+- UI/UX: interfaz básica Tkinter sin guía contextual; no hay paginación ni búsqueda avanzada en tablas grandes.
+- Internacionalización: textos en español fijos; no existe soporte i18n.
+- Paquetes/Dependencias: proyecto usa solo librerías stdlib; esto facilita despliegue, pero falta definir un `requirements.txt` o `pyproject.toml` para reproducibilidad (aunque stdlib evita muchas dependencias externas).
+
+5. Oportunidades de mejora (priorizadas)
+Prioridad Alta (impacto + seguridad + integridad)
+- P1: Añadir mecanismo de migraciones robusto y limpiar columnas legacy (escribir migraciones idempotentes y pruebas de migración). (2-4h)
+- P2: Mejorar almacenamiento de contraseñas: usar PBKDF2/Argon2 con salt (biblioteca `hashlib.pbkdf2_hmac` o `argon2-cffi`). (1-3h)
+- P3: Añadir logging central (archivo rotativo) y manejo de excepciones global (capturar excepciones no controladas y guardar trazas). (1-2h)
+- P4: Añadir tests básicos (unitarios) para modelos y controllers críticos (recepción, catalogación, inventario, distribución). (4-8h)
+
+Prioridad Media (usabilidad y fiabilidad)
+- P5: Mejorar validaciones de formulario y normalización de datos (ISBN, Dewey, peso, dimensiones). (2-4h)
+- P6: Añadir búsqueda y filtrado en vistas de tablas, paginación y ordenamiento. (3-6h)
+- P7: Implementar export/import CSV para catálogos y lotes de recepción. (3-6h)
+- P8: Añadir confirmaciones y auditoría (registro de quién hizo qué y cuándo). (2-4h)
+
+Prioridad Baja (funcionalidades y escalabilidad)
+- P9: Extraer API mínima (HTTP) o migrar a solución cliente/servidor para multiusuario (uso de Flask/FastAPI + SQLite o Postgres). (alto esfuerzo, 2-4 semanas)
+- P10: Mejoras UI: usar un toolkit más potente (PySide6/Qt) o empaquetado visual moderno. (depende de presupuesto)
+- P11: Soporte para imágenes/portadas y gestión de metadatos MARC o integración con bibliotecas externas.
+
+6. Recomendaciones técnicas concretas
+- Migraciones: crear un pequeño módulo `database/migration_versions` que guarde versión y aplique scripts incrementales (idempotentes). Evitar ALTER con constraints no permisibles en SQLite; usar técnicas de tabla temporal cuando sea necesario.
+- Hashing: migrar a PBKDF2-HMAC-SHA256 con salt único por usuario y un número de iteraciones configurable (ejemplo con `hashlib.pbkdf2_hmac`). Opcional: usar `argon2-cffi` si se permite dependencia externa.
+- Logging: usar `logging` con `RotatingFileHandler`; colocar archivos en `logs/app.log` y no en el repo.
+- Tests: añadir `tests/` con pytest y crear tests que usen bases de datos temporales en memoria (`sqlite3.connect(':memory:')`).
+- UI: añadir utilidades de confirmación y validadores compartidos; refactorizar vistas para desacoplar lógica de presentación (extract helpers en `core/view_engine.py`).
+- Backups: política simple de backups del `biblioteca.db` (copia horaria o al cierre de sesión) y comando UI para exportar copia.
+
+7. Plan de trabajo sugerido (sprints cortos)
+Sprint 1 (1 semana):
+- Implementar hashing seguro (PBKDF2) y migración de contraseñas.
+- Añadir logging y manejo global de excepciones.
+- Añadir `README.md` con cómo ejecutar y dependencias.
+
+Sprint 2 (1-2 semanas):
+- Implementar migraciones robustas y limpiar columnas legacy.
+- Añadir tests unitarios para modelos clave.
+- Mejorar validaciones en formularios críticos.
+
+Sprint 3 (2 semanas):
+- Búsqueda/filtrado/paginación en vistas.
+- Export/Import CSV y backups automáticos.
+- Auditoría de operaciones (registro de usuarios y cambios).
+
+8. Tareas rápidas recomendadas (prioridad inmediata)
+- Agregar `analisis_mejoras.txt` (este archivo) al repo y hacer commit.
+- Añadir `.gitignore` si no existe (ya presente) y mover `biblioteca.db` a `data/` o excluirlo (ya excluido).
+- Añadir `requirements.txt` si se van a incorporar libs externas (argon2, pytest).
+
+9. Estimaciones y recursos
+- P1–P4 (prioridad alta): ~10–18 horas para una persona con experiencia en Python/SQLite.
+- P5–P8 (media): ~12–30 horas en total dependiendo del alcance UI.
+- P9–P11 (baja/alto esfuerzo): proyectos separados, 2–6 semanas.
+
+10. Pruebas y despliegue
+- Validar cambios localmente con `python -m py_compile` y ejecutar `main.py`.
+- Crear pruebas unitarias y ejecutar `pytest` en CI (puede usarse GitHub Actions simple).
+- Documentar pasos de backup y restauración.
+
+11. Siguientes pasos sugeridos (accionables ahora)
+- Confirmar si se prefiere `PBKDF2` (sin dependencias) o `argon2` (mejor seguridad, dep externa).
+- Decidir si mantener aplicación como local-First (SQLite) o migrar a servidor (Postgres) para multiusuario.
+- Aceptar que prepare los commits: (a) `analisis_mejoras.txt` ya creado; (b) si confirmas, hago commit y push.
+
+--- FIN DEL DOCUMENTO ---

@@ -22,8 +22,8 @@ class Libro:
             """
             INSERT INTO libros (
                 num_registro, titulo, autor, genero_id, codigo_dewey,
-                isbn, dimensiones, peso, observaciones
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                isbn, dimensiones, peso, observaciones, origen_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 num_registro.strip() if num_registro else None,
@@ -35,6 +35,7 @@ class Libro:
                 dimensiones.strip(),
                 peso,
                 observaciones.strip(),
+                1,
             ),
         )
         self.conn.commit()

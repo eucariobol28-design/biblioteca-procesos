@@ -89,7 +89,7 @@ def render(workspace, router):
             if not (titulo and autor and genero and codigo_dewey and isbn and dimensiones and sala_id):
                 raise ValueError("Todos los campos deben estar completos.")
 
-            controller.guardar_libro(
+            libro_id = controller.guardar_libro(
                 num_registro,
                 titulo,
                 autor,
@@ -107,6 +107,30 @@ def render(workspace, router):
                 "Recepción completada",
                 "El libro ha sido recibido y registrado en el inventario central.",
             )
+            # Si el usuario marcó la opción, ejecutar catalogación experta y aplicar resultado
+            if ejecutar_experto_var.get():
+                registro = {
+                    "num_registro": num_registro,
+                    "titulo": titulo,
+                    "autor": autor,
+                    "editorial": "",
+                    "ciudad": "",
+                    "year": None,
+                    "paginas": None,
+                    "dimensiones": dimensiones,
+                    "isbn": isbn,
+                    "cantidad": cantidad,
+                    "observaciones": observaciones,
+                    "genero": None,
+                }
+                resultado = controller.procesar_catalogacion_experta(registro)
+                try:
+                    controller.aplicar_resultado_experto(libro_id, resultado, encolar=True)
+                    status_label.config(text="Catalogación experta aplicada: cota guardada y encolada.")
+                    messagebox.showinfo("Catalogación experta", f"Cota aplicada: {resultado.get('fase_3', {}).get('cota')}")
+                except Exception as e:
+                    messagebox.showerror("Error al aplicar catalogación experta", str(e))
+                    status_label.config(text="")
             limpiar_formulario()
         except Exception as error:
             messagebox.showerror("Error de recepción", str(error))
@@ -114,3 +138,7 @@ def render(workspace, router):
 
     guardar_button = ttk.Button(frame, text="Guardar Recepción", command=guardar)
     guardar_button.pack(anchor=tk.E, pady=16)
+
+    ejecutar_experto_var = tk.BooleanVar(value=False)
+    ejecutar_experto_cb = ttk.Checkbutton(frame, text="Ejecutar catalogación experta después de guardar", variable=ejecutar_experto_var)
+    ejecutar_experto_cb.pack(anchor=tk.W, pady=(0, 8))

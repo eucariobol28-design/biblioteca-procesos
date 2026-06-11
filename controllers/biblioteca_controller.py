@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Dict, List
 import hashlib
+import re
+import time
 
 from database.conexion import Database
 from models.biblioteca import Biblioteca
@@ -229,3 +231,142 @@ class BibliotecaController:
 
     def obtener_destino(self, destino_id: int):
         return self.distribucion_model.obtener_biblioteca(destino_id)
+
+    def procesar_catalogacion_experta(self, registro: Dict) -> Dict:
+        """Procesa un registro de recepción y devuelve las fases de catalogación.
+
+        `registro` puede contener claves: num_registro, titulo, autor, editorial,
+        ciudad, year, paginas, dimensiones, isbn, cantidad, observaciones, genero
+        """
+        # --- Fase 1: Análisis Técnico y Registro ---
+        num_registro = registro.get("num_registro") or f"ACQ-{int(time.time())}"
+        sello_paginas = ["Portada", "Página 17"]
+        observ = (registro.get("observaciones") or "").lower()
+        problemas = [k for k in ["dañado", "rasgado", "moho", "humedad", "rotura", "manchado"] if k in observ]
+        dictamen = "Estado óptimo" if not problemas else f"Requiere atención técnica: {', '.join(problemas)}"
+
+        fase1 = {
+            "num_adquisicion": num_registro,
+            "sellado_en": sello_paginas,
+            "dictamen_examen_tecnico": dictamen,
+        }
+
+        # --- Fase 2: Catalogación Descriptiva ---
+        titulo_raw = (registro.get("titulo") or "").strip()
+        # separar titulo y subtitulo
+        subtitle = None
+        for sep in [":", " - ", " / "]:
+            if sep in titulo_raw:
+                main_title, subtitle = [p.strip() for p in titulo_raw.split(sep, 1)]
+                break
+        else:
+            main_title = titulo_raw
+
+        autor_raw = (registro.get("autor") or "").strip()
+        def formatear_autor(a: str) -> str:
+            if "," in a:
+                return " ".join([p.strip() for p in a.split(",")]) if a else a
+            parts = a.split()
+            if len(parts) == 0:
+                return ""
+            if len(parts) == 1:
+                return parts[0]
+            surname = parts[-1]
+            given = " ".join(parts[:-1])
+            return f"{surname}, {given}"
+
+        autor_form = formatear_autor(autor_raw)
+
+        # Pie de imprenta: intentar extraer año y editorial
+        editorial = registro.get("editorial") or registro.get("editor") or ""
+        ciudad = registro.get("ciudad") or ""
+        year = registro.get("year") or registro.get("anio") or None
+        if not year:
+            m = re.search(r"(19|20)\d{2}", registro.get("editorial", "") + " " + (registro.get("observaciones") or ""))
+            year = m.group(0) if m else None
+
+        paginas = registro.get("paginas") or registro.get("numero_paginas") or None
+        if paginas and isinstance(paginas, (int, float)):
+            paginas_str = f"{int(paginas)} p."
+        else:
+            paginas_str = f"{paginas} p." if paginas else "n.p."
+
+        dimensiones = registro.get("dimensiones") or "21 x 14 cm"
+        isbn = registro.get("isbn") or ""
+
+        fase2 = {
+            "autor": autor_form,
+            "titulo_principal": main_title,
+            "subtitulo": subtitle,
+            "pie_de_imprenta": {
+                "ciudad": ciudad,
+                "editorial": editorial,
+                "ano": year,
+            },
+            "descripcion_fisica": {
+                "paginas": paginas_str,
+                "dimensiones": dimensiones,
+            },
+            "isbn": isbn,
+        }
+
+        # --- Fase 3: Catalogación Analítica y Clasificación ---
+        texto_para_materias = f"{main_title} {autor_raw} {registro.get('genero','') or ''}".lower()
+        stopwords = set(["el","la","los","las","de","y","en","a","del","para","con","por","un","una","su","se"])
+        words = [re.sub(r"[^\w]", "", w).lower() for w in main_title.split()]
+        keywords = [w for w in words if w and w not in stopwords][:3]
+        materias = [w.capitalize() for w in keywords]
+
+        dewey = "000"
+        if any(k in texto_para_materias for k in ["literatur", "novel", "poe", "poema"]):
+            dewey = "800"
+        elif any(k in texto_para_materias for k in ["ciencia", "naturale", "biolog", "quim"]):
+            dewey = "500"
+        elif any(k in texto_para_materias for k in ["historia", "histór", "pasado"]):
+            dewey = "900"
+        elif any(k in texto_para_materias for k in ["inform", "comput", "program"]):
+            dewey = "004"
+
+        # apellido para cota
+        surname = autor_form.split(",")[0] if "," in autor_form else (autor_form.split()[-1] if autor_form else "XXX")
+        year_for_cota = year or (str(datetime.now().year))
+        cota = f"{dewey}/{surname[:3].upper()}/{year_for_cota}"
+
+        fase3 = {
+            "materias": materias,
+            "dewey": dewey,
+            "cota": cota,
+        }
+
+        # --- Fase 4: Procesamiento Físico y Salida ---
+        spine_label = f"{cota}\n{surname.upper()}\n{year_for_cota}"
+        opac = {"cargado": True, "mensaje": "Ingreso simulado en OPAC (local)"}
+
+        fase4 = {
+            "etiqueta_lomo": spine_label,
+            "opac": opac,
+        }
+
+        resultado = {
+            "fase_1": fase1,
+            "fase_2": fase2,
+            "fase_3": fase3,
+            "fase_4": fase4,
+        }
+
+        return resultado
+
+    def aplicar_resultado_experto(self, libro_id: int, resultado: Dict, encolar: bool = True) -> None:
+        """Aplica el resultado de catalogación experta: guarda la cota en libros y crea/actualiza ficha.
+
+        Si `encolar` es True, envía la cota a la cola de impresión.
+        """
+        cota = resultado.get("fase_3", {}).get("cota")
+        if not cota:
+            raise ValueError("Resultado experto no contiene una cota válida.")
+        # actualizar cota en libros
+        self.libro_model.actualizar_cota(libro_id, cota)
+        # crear o actualizar ficha y marcar aprobada
+        self.ficha_model.crear_o_actualizar(libro_id, cota)
+        if encolar:
+            self.ficha_model.enviar_a_cola(libro_id, cota)

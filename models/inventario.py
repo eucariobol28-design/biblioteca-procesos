@@ -8,8 +8,8 @@ class Inventario:
     def inicializar_stock(self, libro_id: int, biblioteca_id: int, sala_id: int, cantidad: int) -> None:
         cursor = self.conn.cursor()
         cursor.execute(
-            "INSERT OR REPLACE INTO inventarios (libro_id, biblioteca_id, sala_id, cantidad_total, cantidad_disponible) VALUES (?, ?, ?, ?, ?);",
-            (libro_id, biblioteca_id, sala_id, cantidad, cantidad),
+            "INSERT OR REPLACE INTO inventarios (libro_id, sede_id, biblioteca_id, sala_id, cantidad_total, cantidad_disponible) VALUES (?, ?, ?, ?, ?, ?);",
+            (libro_id, 1, biblioteca_id, sala_id, cantidad, cantidad),
         )
         self.conn.commit()
 
@@ -27,8 +27,8 @@ class Inventario:
             raise ValueError("Stock insuficiente en inventario")
         total_nuevo = total + cantidad_delta if row else cantidad_delta
         cursor.execute(
-            "INSERT OR REPLACE INTO inventarios (libro_id, biblioteca_id, sala_id, cantidad_total, cantidad_disponible) VALUES (?, ?, ?, ?, ?);",
-            (libro_id, biblioteca_id, sala_id, total_nuevo, nuevo),
+            "INSERT OR REPLACE INTO inventarios (libro_id, sede_id, biblioteca_id, sala_id, cantidad_total, cantidad_disponible) VALUES (?, ?, ?, ?, ?, ?);",
+            (libro_id, 1, biblioteca_id, sala_id, total_nuevo, nuevo),
         )
         self.conn.commit()
 

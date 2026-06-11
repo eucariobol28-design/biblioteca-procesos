@@ -1,0 +1,127 @@
+DIAGRAMAS: Casos de Uso y Diagrama de Uso del Sistema
+Proyecto: Biblioteca - Procesos Técnicos
+Fecha: 2026-06-02
+Autor: Equipo de desarrollo / Generado por asistente
+
+--- ANÁLISIS RÁPIDO ---
+Objetivo: Representar de forma clara los actores y los principales casos de uso del sistema (recepción, catalogación, impresión de cotas, distribución satélite, gestión de usuarios y catálogos, reportes) y presentar un diagrama de uso/actividad (flujo) que muestre cómo se usa el sistema en un ciclo típico.
+
+Actores principales identificados:
+- Administrador: gestiona usuarios, catálogos, reportes.
+- Operador / Recepcionista: ingresa recepciones físicas, registra inventario.
+- Catalogador: realiza catalogación, aprueba fichas, genera cotas.
+- Personal de Distribución: prepara y registra envíos a sedes satélite.
+- Impresor: opera la cola de impresión (puede ser rol del operador o externo).
+- Sistema: actor técnico que realiza almacenamiento, colas y generación de documentos.
+
+Supuestos:
+- La "Sede Central" es la fuente inicial del inventario.
+- Existen catálogos parametrizados (bibliotecas, salas, géneros).
+- Las cotas pasan por una cola de impresión tras la aprobación de la ficha.
+
+--- 1) DIAGRAMA DE CASOS DE USO (ASCII) ---
+
+                  (Administrador)                       (Operador)
+                       /   \                              /   \
+                      /     \                            /     \
+                   [Gestionar Usuarios]           [Recepción de Libros]   (Catalogador)
+                          |                             |                      /
+                          |                             |                     /
+                      [Gestionar Catálogos]            [Registrar Inventario]--
+                          |                             |                     \
+                          |                             |                      \
+               [Generar Reportes Mensuales]         [Enviar a Catalogación]   [Catalogación y Generación de Ficha]
+                                                      |                          |
+                                                      |                          |
+                                                 [Enviar a Cola Impresión]-----
+                                                              |
+                                                              |
+                                                       [Imprimir Cotas]
+                                                              |
+                                                       [Distribución a Sedes]
+                                                              |
+                                                       [Registro de Actas y Documentos]
+
+Notas: Las líneas representan interacciones; las cajas entre corchetes representan casos de uso.
+
+--- PlantUML (Casos de Uso) ---
+@startuml
+left to right direction
+actor Administrador
+actor Operador
+actor Catalogador
+actor "Personal Distribución" as Distribucion
+actor Impresor
+rectangle Sistema {
+  Administrador -- (Gestionar Usuarios)
+  Administrador -- (Gestionar Catálogos)
+  Administrador -- (Generar Reportes Mensuales)
+
+  Operador -- (Recepción de Libros)
+  Operador -- (Registrar Inventario)
+  Operador -- (Enviar a Catalogación)
+
+  Catalogador -- (Catalogación y Generación de Ficha)
+  (Catalogación y Generación de Ficha) --> (Enviar a Cola Impresión)
+
+  Impresor -- (Imprimir Cotas)
+  (Enviar a Cola Impresión) ..> (Imprimir Cotas)
+
+  Distribucion -- (Distribución a Sedes)
+  (Imprimir Cotas) --> (Distribución a Sedes)
+}
+@enduml
+
+--- 2) DIAGRAMA DE USO / ACTIVIDAD (FLUJO) ---
+Descripción: flujo típico desde login hasta distribución y reporte.
+
+ASCII-flujo:
+
+[Usuario] --(Login)--> {Pantalla Principal}
+{Pantalla Principal} --(Ir a Recepción)--> [Formulario Recepción]
+[Formulario Recepción] --(Guardar)--> [Registro Libro] -> [Inicializar Inventario en Sede Central]
+[Registro Libro] --(Enviar)--> [Listado Pendientes de Catalogación]
+[Catalogador] --(Seleccionar libro)--> [Calcular Cota] --(Aprobar)--> [Crear/Actualizar Ficha]
+[Crear/Actualizar Ficha] --(Enviar)--> [Cola de Impresión]
+[Cola de Impresión] --(Previsualizar / Imprimir)--> [Imprimir Cotas]
+[Imprimir Cotas] --(Empacar y Generar Acta)--> [Distribución]
+[Distribución] --(Registrar Detalles)--> [Ajustar Inventarios en origen y destino]
+[Administrador] --(Consultar)--> [Generar Reportes Mensuales]
+
+--- PlantUML (Actividad / Flujo) ---
+@startuml
+start
+:Login (Usuario);
+if (Credenciales OK?) then (sí)
+  :Mostrar Panel Principal;
+  fork
+    :Recepción de libros;
+    :Registrar libro y stock en Sede Central;
+  fork again
+    :Gestión de catálogos/usuarios (Administrador opcional);
+  end fork
+  :Listado de libros pendientes;
+  :Catalogador selecciona libro;
+  :Calcular cota;
+  if (Aprobado?) then (sí)
+    :Crear/Actualizar ficha;
+    :Enviar a cola de impresión;
+    :Imprimir cotas (operador/impresor);
+    :Generar documentos/actas;
+    :Registrar distribución y ajustar inventarios;
+  else (no)
+    :Revisar/editar ficha;
+  endif
+  :Generar reportes (opcional);
+else (no)
+  stop
+endif
+stop
+@enduml
+
+--- INSTRUCCIONES Y NOTAS ---
+- El bloque PlantUML está incluido para que copies y pegues en un servidor PlantUML o en tu herramienta (VSCode + PlantUML extension) y generes PNG/SVG.
+- El ASCII sirve para inclusión rápida en documentos .txt si no tienes herramientas UML.
+- Recomendación: guardar este archivo como `diagramas_procesos_tecnicos.txt` (ya creado) y, si quieres, puedo generar los archivos `.puml` y exportar imágenes desde PlantUML.
+
+--- FIN DEL ARCHIVO ---
