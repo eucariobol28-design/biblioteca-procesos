@@ -21,6 +21,23 @@ class Biblioteca:
         self.conn.commit()
         return cursor.lastrowid
 
+    def obtener_por_nombre(self, nombre: str) -> Optional[Dict]:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT id, nombre, parroquia, encargado, tipo FROM bibliotecas WHERE nombre = ?;",
+            (nombre.strip(),),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def actualizar(self, biblioteca_id: int, nombre: str, parroquia: str, encargado: str, tipo: str) -> None:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "UPDATE bibliotecas SET nombre = ?, parroquia = ?, encargado = ?, tipo = ? WHERE id = ?;",
+            (nombre.strip(), parroquia.strip(), encargado.strip(), tipo.strip(), biblioteca_id),
+        )
+        self.conn.commit()
+
     def obtener(self, biblioteca_id: int) -> Optional[Dict]:
         cursor = self.conn.cursor()
         cursor.execute(

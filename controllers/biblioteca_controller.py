@@ -96,6 +96,15 @@ class BibliotecaController:
         if self.conn:
             self.conn.close()
 
+    def crear_o_actualizar_biblioteca(self, nombre: str, parroquia: str = "", encargado: str = "", tipo: str = "Sede Satélite") -> int:
+        """Crea una nueva biblioteca o actualiza la existente por nombre. Devuelve el id."""
+        existing = self.biblioteca_model.obtener_por_nombre(nombre)
+        if existing:
+            self.biblioteca_model.actualizar(existing["id"], nombre, parroquia or existing.get("parroquia", ""), encargado or existing.get("encargado", ""), tipo or existing.get("tipo", "Sede Satélite"))
+            return existing["id"]
+        else:
+            return self.biblioteca_model.crear(nombre, parroquia or "", encargado or "", tipo or "Sede Satélite")
+
     def guardar_libro(
         self,
         num_registro: str,
